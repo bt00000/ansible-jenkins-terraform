@@ -13,16 +13,18 @@
         state: present
 
     - name: Download Jenkins repository key
-      get_url:
-        url: https://pkg.jenkins.io/debian/jenkins.io.key
-        dest: /usr/share/keyrings/jenkins-keyring.asc
-        mode: '0644'
+      shell: |
+        curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
 
     - name: Add Jenkins repository
       apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] http://pkg.jenkins.io/debian-stable binary/"
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
         state: present
         filename: jenkins
+
+    - name: Update APT package cache
+      apt:
+        update_cache: yes
 
     - name: Install Jenkins
       apt:
