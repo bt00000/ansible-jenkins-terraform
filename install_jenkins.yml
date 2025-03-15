@@ -7,9 +7,9 @@
       apt:
         update_cache: yes
 
-    - name: Install Java (Jenkins dependency)
+    - name: Install Java (Jenkins dependency) (Java 17)
       apt:
-        name: openjdk-11-jdk
+        name: openjdk-17-jdk
         state: present
 
     - name: Download Jenkins repository key
