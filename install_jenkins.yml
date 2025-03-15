@@ -12,15 +12,17 @@
         name: openjdk-11-jdk
         state: present
 
-    - name: Add Jenkins repository key
-      apt_key:
+    - name: Download Jenkins repository key
+      get_url:
         url: https://pkg.jenkins.io/debian/jenkins.io.key
-        state: present
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: '0644'
 
     - name: Add Jenkins repository
       apt_repository:
-        repo: "deb http://pkg.jenkins.io/debian-stable binary/"
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] http://pkg.jenkins.io/debian-stable binary/"
         state: present
+        filename: jenkins
 
     - name: Install Jenkins
       apt:
