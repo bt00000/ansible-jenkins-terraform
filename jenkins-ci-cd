@@ -50,18 +50,19 @@ pipeline {
 
         stage('Ansible Configuration') {
             steps {
-                echo 'Running Ansible to configure Jenkins...'
-                // Skip Jenkins installation step if Jenkins is already running
+                echo 'Running Ansible to configure Jenkins & Nginx...'
                 sh '''
                 if ! curl -s http://${JENKINS_SERVER_IP}:8080; then
-                    echo "Jenkins is not running. Running Ansible Playbook to configure Jenkins."
+                    echo "Jenkins is not running. Running Ansible Playbook to configure Jenkins & deploy app."
                     ansible-playbook -i ${JENKINS_SERVER_IP}, --private-key ~/.ssh/id_rsa -u ubuntu install_jenkins.yml
                 else
-                    echo "Jenkins is already running. Skipping Ansible configuration."
+                    echo "Jenkins is already running. Skipping Jenkins setup, but configuring Nginx..."
+                    ansible-playbook -i ${JENKINS_SERVER_IP}, --private-key ~/.ssh/id_rsa -u ubuntu install_jenkins.yml --tags "nginx"
                 fi
                 '''
             }
         }
+
 
         stage('Application Deployment') {
             steps {

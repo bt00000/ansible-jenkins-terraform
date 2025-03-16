@@ -1,119 +1,59 @@
 ---
-- name: Install Jenkins & Terraform on Ubuntu
+- name: Install Jenkins, Terraform, and Nginx on Ubuntu
   hosts: jenkins
   become: yes
   tasks:
+    # Update package list
     - name: Update APT packages
       apt:
         update_cache: yes
 
-    - name: Install Java (Jenkins dependency) (Java 17)
+    # Install Java for Jenkins
+    - name: Install Java (Jenkins dependency)
       apt:
         name: openjdk-17-jdk
         state: present
 
-    - name: Download Jenkins repository key
-      shell: |
-        if [ ! -f /usr/share/keyrings/jenkins-keyring.asc ]; then
-          curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
-        fi
-
-    - name: Add Jenkins repository
-      apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
-        state: present
-        filename: jenkins
-
-    - name: Update APT package cache
-      apt:
-        update_cache: yes
-
+    # Install Jenkins
     - name: Install Jenkins
       apt:
         name: jenkins
         state: present
 
-    - name: Ensure Jenkins user has correct ownership of its directory
-      file:
-        path: /usr/share/jenkins
-        owner: jenkins
-        group: jenkins
-        mode: '0755'
-        state: directory
-
-    - name: Download the latest Jenkins WAR file
-      get_url:
-        url: https://get.jenkins.io/war-stable/latest/jenkins.war
-        dest: /usr/share/jenkins/jenkins.war
-        owner: jenkins
-        group: jenkins
-        mode: '0755'
-
-    - name: Modify Jenkins systemd service file
-      copy:
-        dest: /lib/systemd/system/jenkins.service
-        content: |
-          [Unit]
-          Description=Jenkins Continuous Integration Server
-          After=network.target
-
-          [Service]
-          Type=simple
-          User=jenkins
-          ExecStart=/usr/bin/java -jar /usr/share/jenkins/jenkins.war --httpPort=8080
-          Restart=on-failure
-          SuccessExitStatus=143
-
-          [Install]
-          WantedBy=multi-user.target
-      notify:
-        - Reload systemd
-        - Restart Jenkins
-
-    - name: Install dependencies for Terraform
-      apt:
-        name: 
-          - software-properties-common
-          - gnupg2
-          - curl
-        state: present
-
-    - name: Check if HashiCorp GPG key exists
-      stat:
-        path: /usr/share/keyrings/hashicorp-archive-keyring.gpg
-      register: hashicorp_gpg
-
-    - name: Add HashiCorp GPG key properly (only if missing)
-      shell: |
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-      when: not hashicorp_gpg.stat.exists
-
-    - name: Check if Terraform repository exists
-      shell: grep -q 'https://apt.releases.hashicorp.com' /etc/apt/sources.list.d/hashicorp.list
-      register: terraform_repo_exists
-      ignore_errors: yes
-
-    - name: Add Terraform repository (only if missing)
-      shell: |
-        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-      when: terraform_repo_exists.rc != 0
-
-    - name: Update APT package cache again
-      apt:
-        update_cache: yes
-
-    - name: Install Terraform (only if missing)
+    # Install Terraform
+    - name: Install Terraform
       shell: |
         if ! command -v terraform &> /dev/null; then
           sudo apt install -y terraform
         fi
 
-  handlers:
-    - name: Reload systemd
-      command: systemctl daemon-reload
+    # Install Nginx
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
 
-    - name: Restart Jenkins
-      systemd:
-        name: jenkins
+    - name: Start and enable Nginx
+      service:
+        name: nginx
+        state: started
         enabled: yes
-        state: restarted
+
+    # Deploy an HTML file (Simulated App)
+    - name: Deploy application HTML page
+      copy:
+        content: "<h1>Welcome to My Nginx App on Jenkins Server</h1>"
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    # Set Environment Variables
+    - name: Configure environment variables
+      lineinfile:
+        path: /etc/environment
+        line: "APP_ENV=production"
+        create: yes
+
+    - name: Reload environment variables
+      shell: source /etc/environment
