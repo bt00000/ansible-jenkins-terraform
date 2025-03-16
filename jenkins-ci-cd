@@ -1,0 +1,82 @@
+pipeline {
+    agent any  
+
+    environment {
+        AWS_REGION = 'us-east-1'  
+        SSH_KEY_PATH = '/var/lib/jenkins/.ssh/id_rsa.pub'  
+    }
+
+    stages {
+        stage('Check Terraform Installation') {
+            steps {
+                echo 'Checking Terraform...'
+                sh 'terraform version'
+            }
+        }
+
+        stage('Clone Repository') {
+            steps {
+                echo 'Cloning repository...'
+                git branch: 'main', url: 'https://github.com/bt00000/ansible-jenkins-terraform.git'
+            }
+        }
+
+        stage('Terraform Init & Apply') {
+            steps {
+                echo 'Running Terraform...'
+                sh '''
+                terraform init
+                terraform apply -var=ssh_public_key=${SSH_KEY_PATH} -auto-approve
+                '''
+            }
+        }
+
+        stage('Fetch Jenkins Instance IP') {
+            steps {
+                script {
+                    def terraformOutput = sh(script: "terraform output -raw instance_public_ip", returnStdout: true).trim()
+                    env.JENKINS_SERVER_IP = terraformOutput
+                    echo "Jenkins Server IP: ${env.JENKINS_SERVER_IP}"
+                }
+            }
+        }
+
+        stage('Wait for Instance to be Ready') {
+            steps {
+                echo 'Waiting for Jenkins instance to be ready...'
+                sh 'sleep 30'
+            }
+        }
+
+        stage('Ansible Configuration') {
+            steps {
+                echo 'Running Ansible to configure Jenkins...'
+                // Skip Jenkins installation step if Jenkins is already running
+                sh '''
+                if ! curl -s http://${JENKINS_SERVER_IP}:8080; then
+                    echo "Jenkins is not running. Running Ansible Playbook to configure Jenkins."
+                    ansible-playbook -i ${JENKINS_SERVER_IP}, --private-key ~/.ssh/id_rsa -u ubuntu install_jenkins.yml
+                else
+                    echo "Jenkins is already running. Skipping Ansible configuration."
+                fi
+                '''
+            }
+        }
+
+        stage('Application Deployment') {
+            steps {
+                echo 'Deploying Application...'
+                sh 'echo "Simulating deployment..."'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment Successful!'
+        }
+        failure {
+            echo 'Deployment Failed! Check logs.'
+        }
+    }
+}
