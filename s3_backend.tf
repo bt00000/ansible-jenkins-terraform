@@ -1,9 +1,9 @@
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "jenkins-terraform-state-bucket-bt00000"
 
-#   lifecycle {
-#     prevent_destroy = true
-#   }
+  #   lifecycle {
+  #     prevent_destroy = true
+  #   }
 
   tags = {
     Name        = "Jenkins Terraform State Bucket"

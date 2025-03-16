@@ -7,5 +7,7 @@ variable "ami_id" {
 }
 
 variable "ssh_public_key" {
-  default = "~/.ssh/id_rsa.pub" # Path to SSH public key
+  description = "Path to the SSH public key"
+  default     = "" # Default is empty, so we can pass it dynamically
 }
+
