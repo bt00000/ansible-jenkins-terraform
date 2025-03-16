@@ -1,3 +1,13 @@
+terraform {
+  backend "s3" {
+    bucket         = "jenkins-terraform-state-bucket-bt00000"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-state-locks"
+    encrypt        = true
+  }
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -35,8 +45,8 @@ resource "aws_security_group" "jenkins_sg" {
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"  # Allow all protocols
-    cidr_blocks = ["0.0.0.0/0"]  # Allow all destinations
+    protocol    = "-1"          # Allow all protocols
+    cidr_blocks = ["0.0.0.0/0"] # Allow all destinations
   }
 }
 
