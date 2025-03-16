@@ -1,5 +1,5 @@
 ---
-- name: Install Jenkins on Ubuntu
+- name: Install Jenkins & Terraform on Ubuntu
   hosts: jenkins
   become: yes
   tasks:
@@ -14,7 +14,9 @@
 
     - name: Download Jenkins repository key
       shell: |
-        curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+        if [ ! -f /usr/share/keyrings/jenkins-keyring.asc ]; then
+          curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+        fi
 
     - name: Add Jenkins repository
       apt_repository:
@@ -68,6 +70,44 @@
         - Reload systemd
         - Restart Jenkins
 
+    - name: Install dependencies for Terraform
+      apt:
+        name: 
+          - software-properties-common
+          - gnupg2
+          - curl
+        state: present
+
+    - name: Check if HashiCorp GPG key exists
+      stat:
+        path: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      register: hashicorp_gpg
+
+    - name: Add HashiCorp GPG key properly (only if missing)
+      shell: |
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      when: not hashicorp_gpg.stat.exists
+
+    - name: Check if Terraform repository exists
+      shell: grep -q 'https://apt.releases.hashicorp.com' /etc/apt/sources.list.d/hashicorp.list
+      register: terraform_repo_exists
+      ignore_errors: yes
+
+    - name: Add Terraform repository (only if missing)
+      shell: |
+        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+      when: terraform_repo_exists.rc != 0
+
+    - name: Update APT package cache again
+      apt:
+        update_cache: yes
+
+    - name: Install Terraform (only if missing)
+      shell: |
+        if ! command -v terraform &> /dev/null; then
+          sudo apt install -y terraform
+        fi
+
   handlers:
     - name: Reload systemd
       command: systemctl daemon-reload
@@ -77,41 +117,3 @@
         name: jenkins
         enabled: yes
         state: restarted
-
-# Automates:
-# # 1. Update APT package list
-# sudo apt update -y
-
-# # 2. Install Java 17 (Required for Jenkins)
-# sudo apt install -y openjdk-17-jdk
-
-# # 3. Download and add Jenkins GPG key
-# curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
-
-# # 4. Add Jenkins repository
-# echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-
-# # 5. Update APT package list again (to recognize the new Jenkins repo)
-# sudo apt update -y
-
-# # 6. Install Jenkins
-# sudo apt install -y jenkins
-
-# # 7. Ensure Jenkins user owns its home directory (fixes permission issues)
-# sudo chown -R jenkins:jenkins /var/lib/jenkins
-
-# # 8. Download the latest Jenkins WAR file (Ensures the latest stable version)
-# sudo wget -O /usr/share/jenkins/jenkins.war https://get.jenkins.io/war-stable/latest/jenkins.war
-# sudo chown jenkins:jenkins /usr/share/jenkins/jenkins.war
-# sudo chmod 755 /usr/share/jenkins/jenkins.war
-
-# # 9. Reload systemd to apply Jenkins service modifications
-# sudo systemctl daemon-reload
-
-# # 10. Enable and start Jenkins service
-# sudo systemctl enable jenkins
-# sudo systemctl restart jenkins
-
-# # 11. Check if Jenkins is running
-# sudo systemctl status jenkins
-
