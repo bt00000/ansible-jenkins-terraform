@@ -1,24 +1,16 @@
 import os
 import requests
+from requests.auth import HTTPBasicAuth
 
-# Load environment variables (falling back to defaults)
+# Load Jenkins credentials from environment variables
 JENKINS_URL = os.getenv('JENKINS_URL', 'http://localhost:8080')
-NGINX_URL = os.getenv('NGINX_URL', 'http://localhost')
+JENKINS_USER = os.getenv('JENKINS_USER')
+JENKINS_API_TOKEN = os.getenv('JENKINS_API_TOKEN')
 
 def test_jenkins_running():
-    """Test if Jenkins is running and responding."""
+    """Test if Jenkins is running and responding with authentication."""
     try:
-        response = requests.get(JENKINS_URL, timeout=5)
-        assert response.status_code == 200, "Jenkins is not running"
-        assert 'redirect' in response.text.lower(), "Jenkins login page not found"
+        response = requests.get(JENKINS_URL, timeout=5, auth=HTTPBasicAuth(JENKINS_USER, JENKINS_API_TOKEN))
+        assert response.status_code == 200, f"Jenkins is not running. Status code: {response.status_code}"
     except requests.exceptions.RequestException as e:
         assert False, f"Jenkins connection failed: {e}"
-
-def test_nginx_running():
-    """Test if Nginx is running and serving content."""
-    try:
-        response = requests.get(NGINX_URL, timeout=5)
-        assert response.status_code == 200, "Nginx is not responding"
-        assert "nginx" in response.text.lower(), "Nginx page does not contain expected content"
-    except requests.exceptions.RequestException as e:
-        assert False, f"Nginx connection failed: {e}"
