@@ -61,19 +61,29 @@ pipeline {
                 '''
             }
         }
+        
+        stage('Create Inventory File') {
+            steps {
+                echo 'Creating inventory file...'
+                sh """
+                echo '[jenkins]' > inventory.ini
+                echo '${JENKINS_SERVER_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa' >> inventory.ini
+                """
+            }
+        }
 
         stage('Ansible Configuration') {
             steps {
                 echo 'Running Ansible to configure Jenkins & Nginx...'
-                sh '''
+                sh """
                 if ! curl -s http://${JENKINS_SERVER_IP}:8080; then
                     echo "Jenkins is not running. Running Ansible Playbook to configure Jenkins & deploy app."
                     sudo ansible-playbook -i inventory.ini install_jenkins.yml
                 else
                     echo "Jenkins is already running. Skipping Jenkins setup, but configuring Nginx..."
-                    sudo ansible-playbook -i inventory.ini install_jenkins.yml --tags "nginx"
+                    sudo ansible-playbook -i inventory.ini install_jenkins.yml --tags nginx
                 fi
-                '''
+                """
             }
         }
 
