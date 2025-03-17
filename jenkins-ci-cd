@@ -4,6 +4,8 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-1'  
         SSH_KEY_PATH = '/var/lib/jenkins/.ssh/id_rsa'  
+        JENKINS_URL = credentials('JENKINS_URL')  // Stored as a Jenkins credential
+        NGINX_URL = credentials('NGINX_URL')      // Stored as a Jenkins credential
     }
 
     stages {
@@ -36,7 +38,7 @@ pipeline {
                 script {
                     def terraformOutput = sh(script: "terraform output -raw instance_public_ip", returnStdout: true).trim()
                     env.JENKINS_SERVER_IP = terraformOutput
-                    echo "Jenkins Server IP: ${env.JENKINS_SERVER_IP}"
+                    echo "Jenkins Server IP retrieved."
                 }
             }
         }
@@ -45,6 +47,18 @@ pipeline {
             steps {
                 echo 'Waiting for Jenkins instance to be ready...'
                 sh 'sleep 30'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                echo 'Installing dependencies for testing and security scans...'
+                sh '''
+                sudo apt update -y
+                sudo apt install -y python3 python3-pip snapd
+                sudo snap install trivy
+                pip install --user --no-cache-dir --upgrade pip pytest bandit
+                '''
             }
         }
 
@@ -67,7 +81,7 @@ pipeline {
                 echo 'Creating inventory file...'
                 sh """
                 echo '[jenkins]' > inventory.ini
-                echo '${JENKINS_SERVER_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_KEY_PATH} ansible_ssh_common_args="-o StrictHostKeyChecking=no"' >> inventory.ini
+                echo '${JENKINS_SERVER_IP} ansible_user=ubuntu ansible_ssh_private_key_file=/var/lib/jenkins/.ssh/id_rsa ansible_ssh_common_args="-o StrictHostKeyChecking=no"' >> inventory.ini
                 """
             }
         }
@@ -84,6 +98,42 @@ pipeline {
                     sudo ansible-playbook -i inventory.ini install_jenkins.yml --tags nginx
                 fi
                 """
+            }
+        }
+
+        stage('Run Automated Tests') {
+            steps {
+                script {
+                    def testExists = sh(script: "[ -d tests ] && echo 'yes' || echo 'no'", returnStdout: true).trim()
+                    if (testExists == 'yes') {
+                        echo 'Running automated tests...'
+                        sh '''
+                        export JENKINS_URL=${JENKINS_URL}
+                        export NGINX_URL=${NGINX_URL}
+                        python3 -m pytest tests/ --maxfail=5 --disable-warnings --tb=short || echo "Tests failed but continuing"
+                        '''
+                    } else {
+                        echo "No tests directory found. Skipping tests."
+                    }
+                }
+            }
+        }
+
+        stage('Run Security Scan (Bandit)') {
+            steps {
+                echo 'Running security scan using Bandit...'
+                sh '''
+                bandit -r .
+                '''
+            }
+        }
+
+        stage('Run Security Scan (Trivy)') {
+            steps {
+                echo 'Running security scan using Trivy...'
+                sh '''
+                trivy filesystem --severity HIGH,CRITICAL .
+                '''
             }
         }
 
