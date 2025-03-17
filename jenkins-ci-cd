@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'  
-        SSH_KEY_PATH = '/var/lib/jenkins/.ssh/id_rsa.pub'  
+        SSH_KEY_PATH = '/var/lib/jenkins/.ssh/id_rsa'  
     }
 
     stages {
@@ -26,7 +26,7 @@ pipeline {
                 echo 'Running Terraform...'
                 sh '''
                 terraform init
-                terraform apply -var=ssh_public_key=${SSH_KEY_PATH} -auto-approve
+                terraform apply -var=ssh_public_key=${SSH_KEY_PATH}.pub -auto-approve
                 '''
             }
         }
@@ -61,13 +61,13 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Create Inventory File') {
             steps {
                 echo 'Creating inventory file...'
                 sh """
                 echo '[jenkins]' > inventory.ini
-                echo '${JENKINS_SERVER_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa' >> inventory.ini
+                echo '${JENKINS_SERVER_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_KEY_PATH} ansible_ssh_common_args="-o StrictHostKeyChecking=no"' >> inventory.ini
                 """
             }
         }
