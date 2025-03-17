@@ -1,6 +1,6 @@
 ---
 - name: Install Jenkins, Terraform, and Nginx on Ubuntu
-  hosts: jenkins
+  hosts: all
   become: yes
   tasks:
     # Update package list
@@ -27,7 +27,11 @@
           sudo apt install -y terraform
         fi
 
-    # Install Nginx
+- name: Install Nginx and Deploy App
+  hosts: all
+  become: yes
+  tags: nginx
+  tasks:
     - name: Install Nginx
       apt:
         name: nginx
@@ -49,11 +53,8 @@
         mode: '0644'
 
     # Set Environment Variables
-    - name: Configure environment variables
+    - name: Ensure environment variable is set
       lineinfile:
         path: /etc/environment
-        line: "APP_ENV=production"
+        line: 'APP_ENV=production'
         create: yes
-
-    - name: Reload environment variables
-      shell: source /etc/environment

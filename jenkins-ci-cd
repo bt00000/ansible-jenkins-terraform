@@ -48,21 +48,34 @@ pipeline {
             }
         }
 
+        stage('Install Ansible on Jenkins') {
+            steps {
+                echo 'Installing Ansible on Jenkins...'
+                sh '''
+                if ! command -v ansible &> /dev/null; then
+                    sudo apt update -y
+                    sudo DEBIAN_FRONTEND=noninteractive apt install -y ansible
+                else
+                    echo "Ansible is already installed."
+                fi
+                '''
+            }
+        }
+
         stage('Ansible Configuration') {
             steps {
                 echo 'Running Ansible to configure Jenkins & Nginx...'
                 sh '''
                 if ! curl -s http://${JENKINS_SERVER_IP}:8080; then
                     echo "Jenkins is not running. Running Ansible Playbook to configure Jenkins & deploy app."
-                    ansible-playbook -i ${JENKINS_SERVER_IP}, --private-key ~/.ssh/id_rsa -u ubuntu install_jenkins.yml
+                    sudo ansible-playbook -i inventory.ini install_jenkins.yml
                 else
                     echo "Jenkins is already running. Skipping Jenkins setup, but configuring Nginx..."
-                    ansible-playbook -i ${JENKINS_SERVER_IP}, --private-key ~/.ssh/id_rsa -u ubuntu install_jenkins.yml --tags "nginx"
+                    sudo ansible-playbook -i inventory.ini install_jenkins.yml --tags "nginx"
                 fi
                 '''
             }
         }
-
 
         stage('Application Deployment') {
             steps {
